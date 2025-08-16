@@ -51,14 +51,30 @@ Namespace Ventrian.SubscriptionTools.Tools
             stOut.Close()
 
             ' Do the request to PayPal and get the response
-            Dim httpWebResponse As HttpWebResponse = DirectCast(req.GetResponse(), HttpWebResponse)
-            Using streamReader As New StreamReader(httpWebResponse.GetResponseStream())
-                strResponse = streamReader.ReadToEnd()
-                streamReader.Close()
-            End Using
+            Try
+                Dim httpWebResponse As HttpWebResponse = DirectCast(req.GetResponse(), HttpWebResponse)
+                Using streamReader As New StreamReader(httpWebResponse.GetResponseStream())
+                    strResponse = streamReader.ReadToEnd()
+                    streamReader.Close()
+                End Using
 
-            ' Confirm whether the IPN was VERIFIED or INVALID. If INVALID, just ignore the IPN
-            Return (httpWebResponse.StatusCode = HttpStatusCode.OK)
+                ' Confirm whether the IPN was VERIFIED or INVALID. If INVALID, just ignore the IPN
+                Return (httpWebResponse.StatusCode = HttpStatusCode.OK)
+            Catch ex As WebException
+                ' Log the specific error for debugging
+                Dim errorMessage As String = String.Format("PayPal IPN Verification Error - URL: {0}, Error: {1}", serverURL, ex.Message)
+                If ex.Response IsNot Nothing Then
+                    errorMessage += String.Format(" - Response Status: {0}", CType(ex.Response, HttpWebResponse).StatusCode)
+                End If
+                Dim objEventLogController As New DotNetNuke.Services.Log.EventLog.EventLogController
+                objEventLogController.AddLog("PayPal IPN Error", errorMessage, DotNetNuke.Services.Log.EventLog.EventLogController.EventLogType.ADMIN_ALERT)
+                Return False
+            Catch ex As Exception
+                ' Log any other unexpected errors
+                Dim objEventLogController As New DotNetNuke.Services.Log.EventLog.EventLogController
+                objEventLogController.AddLog("PayPal IPN Unexpected Error", ex.ToString(), DotNetNuke.Services.Log.EventLog.EventLogController.EventLogType.ADMIN_ALERT)
+                Return False
+            End Try
 
         End Function
 
@@ -285,16 +301,16 @@ Namespace Ventrian.SubscriptionTools.Tools
                     symbol = "$"
 
                 Case "GBP"
-                    symbol = "£"
+                    symbol = "ï¿½"
 
                 Case "EUR"
-                    symbol = "€"
+                    symbol = "ï¿½"
 
                 Case "CAD"
                     symbol = "$"
 
                 Case "JPY"
-                    symbol = "¥"
+                    symbol = "ï¿½"
             End Select
 
             Dim invoice As String = ""
