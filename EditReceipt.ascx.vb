@@ -64,6 +64,55 @@ Namespace Ventrian.SubscriptionTools
 
         End Sub
 
+        Private Sub BindUsers()
+
+            Dim objUserController As New UserController
+            Dim objUsers As ArrayList = objUserController.GetUsers(Me.PortalId)
+
+            ' Sort users by DisplayName alphabetically
+            objUsers.Sort(New UserDisplayNameComparer())
+
+            ' Add a default "Select User" option
+            Dim defaultUser As New UserInfo
+            defaultUser.UserID = -1
+            defaultUser.DisplayName = "-- Select User --"
+            objUsers.Insert(0, defaultUser)
+
+            ' Set the data text field to show FirstName + LastName + / + DisplayName
+            drpUsers.DataTextField = "DisplayName"
+            drpUsers.DataValueField = "UserID"
+            drpUsers.DataSource = objUsers
+            drpUsers.DataBind()
+
+            ' Customize the display text for each user (except the default option)
+            For i As Integer = 1 To drpUsers.Items.Count - 1
+                Dim user As UserInfo = CType(objUsers(i), UserInfo)
+                Dim displayText As String = ""
+                
+                ' Build the display text: FirstName + LastName + / + DisplayName
+                If Not String.IsNullOrEmpty(user.FirstName) AndAlso Not String.IsNullOrEmpty(user.LastName) Then
+                    displayText = user.FirstName.Trim() & " " & user.LastName.Trim()
+                ElseIf Not String.IsNullOrEmpty(user.FirstName) Then
+                    displayText = user.FirstName.Trim()
+                ElseIf Not String.IsNullOrEmpty(user.LastName) Then
+                    displayText = user.LastName.Trim()
+                End If
+                
+                ' Add the DisplayName if it exists and is different
+                If Not String.IsNullOrEmpty(user.DisplayName) AndAlso displayText <> user.DisplayName Then
+                    If displayText.Length > 0 Then
+                        displayText = displayText & " / " & user.DisplayName
+                    Else
+                        displayText = user.DisplayName
+                    End If
+                End If
+                
+                ' Set the display text
+                drpUsers.Items(i).Text = displayText
+            Next
+
+        End Sub
+
         Private Sub BindPlans()
 
             Dim objPlanController As New PlanController
@@ -79,16 +128,16 @@ Namespace Ventrian.SubscriptionTools
                             symbol = "$"
 
                         Case "GBP"
-                            symbol = "£"
+                            symbol = "ï¿½"
 
                         Case "EUR"
-                            symbol = "€"
+                            symbol = "ï¿½"
 
                         Case "CAD"
                             symbol = "$"
 
                         Case "JPY"
-                            symbol = "¥"
+                            symbol = "ï¿½"
                     End Select
 
                     Dim _details As String = ""
@@ -187,8 +236,11 @@ Namespace Ventrian.SubscriptionTools
 
                 ReadQueryString()
 
-                If (_receiptID = Null.NullInteger Or _receiptID < 0) AndAlso (Request("username") IsNot Nothing) Then
-                    txtUserName.Text = Request("username")
+                If (_receiptID = Null.NullInteger Or _receiptID < 0) AndAlso (Request("UserID") IsNot Nothing) Then
+                    Dim userID As Integer = Convert.ToInt32(Request("UserID"))
+                    If userID > 0 Then
+                        drpUsers.SelectedValue = userID.ToString()
+                    End If
                 End If
 
                 BindCrumbs()
@@ -196,6 +248,7 @@ Namespace Ventrian.SubscriptionTools
 
                 If (IsPostBack = False) Then
 
+                    BindUsers()
                     BindPlans()
                     BindReceipt()
 
@@ -209,78 +262,155 @@ Namespace Ventrian.SubscriptionTools
 
         Private Sub cmdUpdate_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles cmdUpdate.Click
 
-            If (Page.IsValid) Then
+            Try
+                If (Page.IsValid) Then
 
-                Dim objReceipt As New ReceiptInfo
-
-                objReceipt.ModuleID = Me.ModuleId
-                objReceipt.PortalID = Me.PortalId
-                objReceipt.Status = "Complete"
-                objReceipt.Processor = txtProcessor.Text
-                objReceipt.ProcessorTxID = txtTransactionID.Text
-
-                Dim objPlanController As New PlanController
-                Dim objPlan As PlanInfo = objPlanController.Get(Convert.ToInt32(drpSelectPlan.SelectedValue))
-
-                objReceipt.BillingFrequency = objPlan.BillingFrequency
-                objReceipt.BillingPeriod = objPlan.BillingPeriod
-                objReceipt.ServiceFee = objPlan.ServiceFee
-                objReceipt.Name = objPlan.Name
-
-                objReceipt.DateCreated = DateTime.Now
-                If (txtStartDate.Text <> "") Then
-                    objReceipt.DateStart = Convert.ToDateTime(txtStartDate.Text)
-                Else
-                    objReceipt.DateStart = DateTime.Now
-                End If
-
-                Dim objUser As UserInfo = UserController.GetUserByName(Me.PortalId, txtUserName.Text)
-
-                objReceipt.UserID = objUser.UserID
-
-                Dim objRoleController As New RoleController
-                Dim objUserRole As UserRoleInfo = objRoleController.GetUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID)
-
-                If Not (objUserRole Is Nothing) Then
-                    If (objUserRole.ExpiryDate <> Null.NullDate) Then
-                        If (objUserRole.ExpiryDate > DateTime.Now) Then
-                            objReceipt.DateStart = objUserRole.ExpiryDate
-                        End If
+                    ' Validate required fields
+                    If drpSelectPlan.SelectedValue Is Nothing OrElse String.IsNullOrEmpty(drpSelectPlan.SelectedValue) Then
+                        ' Show error - no plan selected
+                        Return
                     End If
-                End If
 
-                Select Case objPlan.BillingFrequencyType
-                    Case FrequencyType.OneTimeFee
+                    If drpUsers.SelectedValue Is Nothing OrElse String.IsNullOrEmpty(drpUsers.SelectedValue) Then
+                        ' Show error - no user selected
+                        Return
+                    End If
+
+                    Dim objReceipt As New ReceiptInfo
+
+                    objReceipt.ModuleID = Me.ModuleId
+                    objReceipt.PortalID = Me.PortalId
+                    objReceipt.Status = "Complete"
+                    objReceipt.Processor = If(txtProcessor.Text, "Manual")
+                    objReceipt.ProcessorTxID = If(txtTransactionID.Text, "")
+
+                    Dim objPlanController As New PlanController
+                    Dim planID As Integer = Convert.ToInt32(drpSelectPlan.SelectedValue)
+                    Dim objPlan As PlanInfo = objPlanController.Get(planID)
+
+                    ' Validate plan exists
+                    If objPlan Is Nothing Then
+                        ' Show error - plan not found
+                        Return
+                    End If
+
+                    objReceipt.BillingFrequency = objPlan.BillingFrequency
+                    objReceipt.BillingPeriod = objPlan.BillingPeriod
+                    objReceipt.ServiceFee = objPlan.ServiceFee
+                    objReceipt.Name = objPlan.Name
+
+                    objReceipt.DateCreated = DateTime.Now
+                    
+                    ' Safely handle start date
+                    Try
+                        If Not String.IsNullOrEmpty(txtStartDate.Text) Then
+                            objReceipt.DateStart = Convert.ToDateTime(txtStartDate.Text)
+                        Else
+                            objReceipt.DateStart = DateTime.Now
+                        End If
+                    Catch ex As Exception
+                        ' If date parsing fails, use current date
+                        objReceipt.DateStart = DateTime.Now
+                    End Try
+
+                    Dim selectedUserID As Integer = Convert.ToInt32(drpUsers.SelectedValue)
+                    If selectedUserID <= 0 Then
+                        ' Show error message
+                        Return
+                    End If
+
+                    objReceipt.UserID = selectedUserID
+                    
+                    ' Get the user info to set the UserName and other user-related fields
+                    Dim objUserController As New UserController
+                    Dim objUser As UserInfo = objUserController.GetUser(Me.PortalId, selectedUserID)
+                    If objUser IsNot Nothing Then
+                        ' Safely set user properties with null checks
+                        objReceipt.UserName = If(objUser.Username, "")
+                        objReceipt.FirstName = If(objUser.FirstName, "")
+                        objReceipt.LastName = If(objUser.LastName, "")
+                        objReceipt.Email = If(objUser.Email, "")
+                        objReceipt.DisplayName = If(objUser.DisplayName, "")
+                    End If
+
+                    ' Safely handle role logic
+                    Dim objRoleController As New RoleController
+                    Dim objUserRole As UserRoleInfo = Nothing
+                    Try
+                        objUserRole = objRoleController.GetUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID)
+                    Catch ex As Exception
+                        ' Role lookup failed, continue without role
+                        objUserRole = Nothing
+                    End Try
+
+                    If Not (objUserRole Is Nothing) Then
+                        Try
+                            If (objUserRole.ExpiryDate <> Null.NullDate) Then
+                                If (objUserRole.ExpiryDate > DateTime.Now) Then
+                                    objReceipt.DateStart = objUserRole.ExpiryDate
+                                End If
+                            End If
+                        Catch ex As Exception
+                            ' Date comparison failed, continue with current date
+                        End Try
+                    End If
+
+                    ' Safely calculate end date
+                    Try
+                        Select Case objPlan.BillingFrequencyType
+                            Case FrequencyType.OneTimeFee
+                                objReceipt.DateEnd = Null.NullDate
+                                Exit Select
+                            Case FrequencyType.Day
+                                objReceipt.DateEnd = objReceipt.DateStart.AddDays(objPlan.BillingPeriod)
+                                Exit Select
+                            Case FrequencyType.Week
+                                objReceipt.DateEnd = objReceipt.DateStart.AddDays(objPlan.BillingPeriod * 7)
+                                Exit Select
+                            Case FrequencyType.Month
+                                objReceipt.DateEnd = objReceipt.DateStart.AddMonths(objPlan.BillingPeriod)
+                                Exit Select
+                            Case FrequencyType.Year
+                                objReceipt.DateEnd = objReceipt.DateStart.AddYears(objPlan.BillingPeriod)
+                                Exit Select
+                            Case FrequencyType.FixedEndDate
+                                objReceipt.DateEnd = objPlan.EndDate
+                                Exit Select
+                        End Select
+                    Catch ex As Exception
+                        ' Date calculation failed, set to null
                         objReceipt.DateEnd = Null.NullDate
-                        Exit Select
-                    Case FrequencyType.Day
-                        objReceipt.DateEnd = objReceipt.DateStart.AddDays(objPlan.BillingPeriod)
-                        Exit Select
-                    Case FrequencyType.Week
-                        objReceipt.DateEnd = objReceipt.DateStart.AddDays(objPlan.BillingPeriod * 7)
-                        Exit Select
-                    Case FrequencyType.Month
-                        objReceipt.DateEnd = objReceipt.DateStart.AddMonths(objPlan.BillingPeriod)
-                        Exit Select
-                    Case FrequencyType.Year
-                        objReceipt.DateEnd = objReceipt.DateStart.AddYears(objPlan.BillingPeriod)
-                        Exit Select
-                    Case FrequencyType.FixedEndDate
-                        objReceipt.DateEnd = objPlan.EndDate
-                        Exit Select
-                End Select
+                    End Try
 
-                Dim objReceiptController As New ReceiptController
-                objReceiptController.Add(objReceipt)
+                    ' Add the receipt
+                    Dim objReceiptController As New ReceiptController
+                    Try
+                        objReceiptController.Add(objReceipt)
+                    Catch ex As Exception
+                        ' Receipt creation failed
+                        Return
+                    End Try
 
-                If (chkAddToRole.Checked) Then
-                    objReceipt.DateStart = objUserRole.ExpiryDate
-                    objRoleController.AddUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID, objReceipt.DateStart, objReceipt.DateEnd)
+                    ' Handle role addition - only if checkbox is checked
+                    If (chkAddToRole.Checked) Then
+                        Try
+                            ' Add the user to the role (DNN will handle duplicates gracefully)
+                            objRoleController.AddUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID, objReceipt.DateStart, objReceipt.DateEnd)
+                        Catch ex As Exception
+                            ' Role assignment failed, but receipt was created
+                            ' Log the error for debugging
+                            DotNetNuke.Services.Exceptions.LogException(ex)
+                        End Try
+                    End If
+
+                    Response.Redirect(EditUrl("EditReceipts"), True)
+
                 End If
 
-                Response.Redirect(EditUrl("EditReceipts"), True)
-
-            End If
+            Catch ex As Exception
+                ' Log the error and show user-friendly message
+                ProcessModuleLoadException(Me, ex)
+            End Try
 
         End Sub
 
@@ -299,20 +429,66 @@ Namespace Ventrian.SubscriptionTools
 
         End Sub
 
-        Private Sub valUserNameExists_ServerValidate(ByVal source As System.Object, ByVal args As System.Web.UI.WebControls.ServerValidateEventArgs) Handles valUserNameExists.ServerValidate
+        Private Sub ValidateUserSelection(ByVal source As System.Object, ByVal e As System.Web.UI.WebControls.ServerValidateEventArgs)
 
-            Dim objUser As UserInfo = UserController.GetUserByName(PortalId, txtUserName.Text)
-
-            If (objUser Is Nothing) Then
-                args.IsValid = False
+            Dim selectedUserID As Integer = Convert.ToInt32(drpUsers.SelectedValue)
+            If selectedUserID <= 0 Then
+                e.IsValid = False
             Else
-                args.IsValid = True
+                e.IsValid = True
             End If
 
         End Sub
 
 #End Region
 
+    End Class
+
+    Public Class UserDisplayNameComparer
+        Implements IComparer
+
+        Public Function Compare(ByVal x As Object, ByVal y As Object) As Integer Implements IComparer.Compare
+            Dim user1 As UserInfo = CType(x, UserInfo)
+            Dim user2 As UserInfo = CType(y, UserInfo)
+
+            If user1 Is Nothing AndAlso user2 Is Nothing Then
+                Return 0
+            ElseIf user1 Is Nothing Then
+                Return -1
+            ElseIf user2 Is Nothing Then
+                Return 1
+            Else
+                ' Build the display text for comparison (same logic as in BindUsers)
+                Dim displayText1 As String = BuildUserDisplayText(user1)
+                Dim displayText2 As String = BuildUserDisplayText(user2)
+                
+                Return String.Compare(displayText1, displayText2, True)
+            End If
+        End Function
+
+        Private Function BuildUserDisplayText(ByVal user As UserInfo) As String
+            Dim displayText As String = ""
+            
+            ' Build the display text: FirstName + LastName + / + DisplayName
+            If Not String.IsNullOrEmpty(user.FirstName) AndAlso Not String.IsNullOrEmpty(user.LastName) Then
+                displayText = user.FirstName.Trim() & " " & user.LastName.Trim()
+            ElseIf Not String.IsNullOrEmpty(user.FirstName) Then
+                displayText = user.FirstName.Trim()
+            ElseIf Not String.IsNullOrEmpty(user.LastName) Then
+                displayText = user.LastName.Trim()
+            End If
+            
+            ' Add the DisplayName if it exists and is different
+            If Not String.IsNullOrEmpty(user.DisplayName) AndAlso displayText <> user.DisplayName Then
+                If displayText.Length > 0 Then
+                    displayText = displayText & " / " & user.DisplayName
+                Else
+                    displayText = user.DisplayName
+                End If
+            End If
+            
+            Return displayText
+        End Function
     End Class
 
 End Namespace

@@ -156,6 +156,9 @@
   <data name="UserName.Text" xml:space="preserve">
     <value>UserName</value>
   </data>
+  <data name="User.Text" xml:space="preserve">
+    <value>User</value>
+  </data>
   <data name="UserName.Help" xml:space="preserve">
     <value>Enter the username you want to add the subscription to.</value>
   </data>

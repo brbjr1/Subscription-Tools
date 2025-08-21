@@ -32,16 +32,14 @@
 	</TR>
 	<TR vAlign="top">
 		<TD width="25"><IMG height=1 src='<%= Page.ResolveUrl("~/Images/Spacer.gif") %>' width=25></TD>
-		<TD class="SubHead" width="150">
-			<dnn:label id="plUserName" runat="server" resourcekey="UserName" suffix=":" controlname="txtUserName"></dnn:label></TD>
-		<TD align="left" width="325">
-			<asp:textbox id="txtUserName" cssclass="NormalTextBox" runat="server" maxlength="255" columns="30"
-				width="325"></asp:textbox>
-			<asp:requiredfieldvalidator id="valUserName" cssclass="NormalRed" runat="server" resourcekey="valUserName.ErrorMessage" controltovalidate="txtUserName"
-				errormessage="<br>You Must Enter a Valid UserName" display="Dynamic"></asp:requiredfieldvalidator>
-			<asp:CustomValidator ID="valUserNameExists" CssClass="NormalRed" Runat="server" ResourceKey="ValUserNameExists.ErrorMessage" ControlToValidate="txtUserName" 
-				errormessage="<br>UserName does not exist" Display="Dynamic" />		
-		</TD>
+			<TD class="SubHead" width="150">
+		<dnn:label id="plUserName" runat="server" resourcekey="User" suffix=":" controlname="drpUsers"></dnn:label></TD>
+	<TD align="left" width="325">
+		<asp:dropdownlist id="drpUsers" cssclass="NormalTextBox" runat="server" DataTextField="DisplayName" DataValueField="UserID" 
+			width="325"></asp:dropdownlist>
+		<asp:requiredfieldvalidator id="valUserName" cssclass="NormalRed" runat="server" resourcekey="valUserName.ErrorMessage" controltovalidate="drpUsers"
+			errormessage="<br>You Must Select a User" display="Dynamic"></asp:requiredfieldvalidator>
+	</TD>
 	</TR>
 	<TR vAlign="top">
 		<TD width="25"><IMG height=1 src='<%= Page.ResolveUrl("~/Images/Spacer.gif") %>' width=25></TD>
