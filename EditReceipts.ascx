@@ -20,8 +20,8 @@
 <table width="100%" border="0">
 	<tr>
 		<td align="left" class="Normal">
-			<asp:Label ID="lblSearch" Runat="server" resourcekey="Search" CssClass="SubHead">Search:</asp:Label><br>
-			<asp:TextBox ID="txtUserName" Runat="server" />&nbsp;<asp:LinkButton ID="btnGo" Runat="server" ResourceKey="Go" CssClass="CommandButton" />&nbsp;<asp:LinkButton ID="btnClear" Runat="server" ResourceKey="Clear" CssClass="CommandButton" />
+			<asp:Label ID="lblSearch" Runat="server" resourcekey="SelectUser" CssClass="SubHead">Select User:</asp:Label><br>
+			<asp:DropDownList ID="drpUsers" Runat="server" CssClass="NormalTextBox" Width="300px" AutoPostBack="True" />&nbsp;<asp:LinkButton ID="btnClear" Runat="server" ResourceKey="Clear" CssClass="CommandButton" />
 		</td>
 		<td align="right" class="Normal">
 			<asp:Label ID="lblRecordsPerPage" Runat="server" resourcekey="RecordsPage" CssClass="SubHead">Records Per Page:</asp:Label><br>

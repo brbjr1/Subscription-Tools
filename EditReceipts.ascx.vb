@@ -41,8 +41,11 @@ Namespace Ventrian.SubscriptionTools
                 End If
             End If
 
-            If Not (Request("UserName") Is Nothing) Then
-                txtUserName.Text = Server.UrlDecode(Request("UserName").Trim())
+            If Not (Request("UserID") Is Nothing) Then
+                Dim userID As Integer = Convert.ToInt32(Request("UserID"))
+                If userID > 0 Then
+                    drpUsers.SelectedValue = userID.ToString()
+                End If
             End If
 
         End Sub
@@ -66,6 +69,54 @@ Namespace Ventrian.SubscriptionTools
 
         End Sub
 
+        Private Sub BindUsers()
+
+            Dim objUserController As New DotNetNuke.Entities.Users.UserController
+            Dim objUsers As ArrayList = objUserController.GetUsers(Me.PortalId)
+
+            ' Sort users by DisplayName alphabetically
+            objUsers.Sort(New UserDisplayNameComparer())
+
+            ' Add a default "All Users" option
+            Dim defaultUser As New DotNetNuke.Entities.Users.UserInfo
+            defaultUser.UserID = -1
+            defaultUser.DisplayName = "-- All Users --"
+            objUsers.Insert(0, defaultUser)
+
+            ' Set the data text field to show FirstName + LastName + / + DisplayName
+            drpUsers.DataTextField = "DisplayName"
+            drpUsers.DataValueField = "UserID"
+            drpUsers.DataSource = objUsers
+            drpUsers.DataBind()
+
+            ' Customize the display text for each user (except the default option)
+            For i As Integer = 1 To drpUsers.Items.Count - 1
+                Dim user As DotNetNuke.Entities.Users.UserInfo = CType(objUsers(i), DotNetNuke.Entities.Users.UserInfo)
+                Dim displayText As String = ""
+                
+                ' Build the display text: FirstName + LastName + / + DisplayName
+                If Not String.IsNullOrEmpty(user.FirstName) AndAlso Not String.IsNullOrEmpty(user.LastName) Then
+                    displayText = user.FirstName.Trim() & " " & user.LastName.Trim()
+                ElseIf Not String.IsNullOrEmpty(user.FirstName) Then
+                    displayText = user.FirstName.Trim()
+                ElseIf Not String.IsNullOrEmpty(user.LastName) Then
+                    displayText = user.LastName.Trim()
+                End If
+                
+                ' Add the DisplayName if it exists and is different
+                If Not String.IsNullOrEmpty(user.DisplayName) AndAlso displayText <> user.DisplayName Then
+                    If displayText.Length > 0 Then
+                        displayText = displayText & " / " & user.DisplayName
+                    Else
+                        displayText = user.DisplayName
+                    End If
+                End If
+                
+                ' Set the display text
+                drpUsers.Items(i).Text = displayText
+            Next
+        End Sub
+
         Private Sub BindReceipts()
 
             Dim PageSize As Integer = Convert.ToInt32(drpRecordsPerPage.SelectedItem.Value)
@@ -74,7 +125,20 @@ Namespace Ventrian.SubscriptionTools
 
             Localization.LocalizeDataGrid(grdReceipts, Me.LocalResourceFile)
 
-            _receipts = objReceiptController.List(Me.PortalId, Me.ModuleId, Null.NullInteger, txtUserName.Text.Trim())
+            ' Get the selected user ID for filtering
+            Dim selectedUserID As Integer = Convert.ToInt32(drpUsers.SelectedValue)
+            Dim userNameFilter As String = ""
+            
+            ' If a specific user is selected (not "All Users"), get their username for filtering
+            If selectedUserID > 0 Then
+                Dim objUserController As New DotNetNuke.Entities.Users.UserController
+                Dim objUser As DotNetNuke.Entities.Users.UserInfo = objUserController.GetUser(Me.PortalId, selectedUserID)
+                If objUser IsNot Nothing Then
+                    userNameFilter = objUser.Username
+                End If
+            End If
+            
+            _receipts = objReceiptController.List(Me.PortalId, Me.ModuleId, Null.NullInteger, userNameFilter)
 
             Dim objPagedDataSource As New PagedDataSource
 
@@ -103,8 +167,8 @@ Namespace Ventrian.SubscriptionTools
 
                 ctlPagingControl.QuerystringParams = "ctl=EditReceipts&mid=" & Me.ModuleId.ToString()
 
-                If (Request("UserName") <> "") Then
-                    ctlPagingControl.QuerystringParams = ctlPagingControl.QuerystringParams & "&UserName=" + Server.UrlEncode(Request("UserName"))
+                If (Request("UserID") <> "") Then
+                    ctlPagingControl.QuerystringParams = ctlPagingControl.QuerystringParams & "&UserID=" + Request("UserID")
                 End If
 
                 If (drpRecordsPerPage.SelectedIndex <> 0) Then
@@ -155,16 +219,16 @@ Namespace Ventrian.SubscriptionTools
                         symbol = "$"
 
                     Case "GBP"
-                        symbol = "£"
+                        symbol = "ï¿½"
 
                     Case "EUR"
-                        symbol = "€"
+                        symbol = "ï¿½"
 
                     Case "CAD"
                         symbol = "$"
 
                     Case "JPY"
-                        symbol = "¥"
+                        symbol = "ï¿½"
                 End Select
 
                 Return symbol & objReceipt.ServiceFee.ToString("##0.00")
@@ -185,6 +249,7 @@ Namespace Ventrian.SubscriptionTools
                 If (Page.IsPostBack = False) Then
                     ReadQueryString()
                     BindCrumbs()
+                    BindUsers()
                     BindReceipts()
                 End If
 
@@ -198,7 +263,19 @@ Namespace Ventrian.SubscriptionTools
 
             Try
 
-                Response.Redirect(EditUrl("UserName", Server.UrlEncode(txtUserName.Text.Trim()), "EditReceipts", "PageRecords=" & drpRecordsPerPage.SelectedValue), True)
+                Response.Redirect(EditUrl("UserID", drpUsers.SelectedValue, "EditReceipts", "PageRecords=" & drpRecordsPerPage.SelectedValue), True)
+
+            Catch exc As Exception    'Module failed to load
+                ProcessModuleLoadException(Me, exc)
+            End Try
+
+        End Sub
+
+        Private Sub drpUsers_SelectedIndexChanged(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles drpUsers.SelectedIndexChanged
+
+            Try
+
+                Response.Redirect(EditUrl("UserID", drpUsers.SelectedValue, "EditReceipts"), True)
 
             Catch exc As Exception    'Module failed to load
                 ProcessModuleLoadException(Me, exc)
@@ -230,17 +307,7 @@ Namespace Ventrian.SubscriptionTools
 
         End Sub
 
-        Private Sub btnGo_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles btnGo.Click
 
-            Try
-
-                Response.Redirect(EditUrl("UserName", Server.UrlEncode(txtUserName.Text.Trim()), "EditReceipts"), True)
-
-            Catch exc As Exception    'Module failed to load
-                ProcessModuleLoadException(Me, exc)
-            End Try
-
-        End Sub
 
         Private Sub btnClear_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles btnClear.Click
 
@@ -257,5 +324,7 @@ Namespace Ventrian.SubscriptionTools
 #End Region
 
     End Class
+
+
 
 End Namespace

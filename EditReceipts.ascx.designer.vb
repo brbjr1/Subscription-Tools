@@ -35,13 +35,13 @@ Namespace Ventrian.SubscriptionTools
         Protected WithEvents lblSearch As Global.System.Web.UI.WebControls.Label
 
         '''<summary>
-        '''txtUserName control.
+        '''drpUsers control.
         '''</summary>
         '''<remarks>
         '''Auto-generated field.
         '''To modify move field declaration from designer file to code-behind file.
         '''</remarks>
-        Protected WithEvents txtUserName As Global.System.Web.UI.WebControls.TextBox
+        Protected WithEvents drpUsers As Global.System.Web.UI.WebControls.DropDownList
 
         '''<summary>
         '''btnGo control.
