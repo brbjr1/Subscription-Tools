@@ -334,10 +334,9 @@ Namespace Ventrian.SubscriptionTools
                     End If
 
                     ' Safely handle role logic
-                    Dim objRoleController As New RoleController
                     Dim objUserRole As UserRoleInfo = Nothing
                     Try
-                        objUserRole = objRoleController.GetUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID)
+                        objUserRole = RoleController.Instance.GetUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID)
                     Catch ex As Exception
                         ' Role lookup failed, continue without role
                         objUserRole = Nothing
@@ -395,7 +394,7 @@ Namespace Ventrian.SubscriptionTools
                     If (chkAddToRole.Checked) Then
                         Try
                             ' Add the user to the role (DNN will handle duplicates gracefully)
-                            objRoleController.AddUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID, objReceipt.DateStart, objReceipt.DateEnd)
+                            RoleController.Instance.AddUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID, RoleStatus.Approved, False, objReceipt.DateStart, objReceipt.DateEnd)
                         Catch ex As Exception
                             ' Role assignment failed, but receipt was created
                             ' Log the error for debugging
