@@ -253,10 +253,10 @@ Namespace Ventrian.SubscriptionTools.Tools
                                     objReceiptController.Update(objReceipt)
                                 End If
 
-                                Dim objRoleController As New RoleController
+                                'Dim objRoleController As New RoleController
                                 'objRoleController.AddUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID, objReceipt.DateEnd)
                                 'AddUserRole(portalId As Integer, userId As Integer, roleId As Integer, effectiveDate As Date, expiryDate As Date)
-                                objRoleController.AddUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID, objReceipt.DateStart, objReceipt.DateEnd)
+                                RoleController.Instance.AddUserRole(objReceipt.PortalID, objReceipt.UserID, objPlan.RoleID, RoleStatus.Approved, False, objReceipt.DateStart, objReceipt.DateEnd)
                             End If
 
                         Next
